@@ -57,8 +57,14 @@ export default function Home() {
     setLoading(true);
     setResult(null);
 
+    const coords = await getCoordinates();
     const formData = new FormData();
     formData.append("file", file);
+
+    if (coords) {
+      formData.append("latitude", coords.latitude.toString());
+      formData.append("longitude", coords.longitude.toString());
+    }
 
     const res = await fetch("http://localhost:8000/analyze", {
       method: "POST",
@@ -76,10 +82,16 @@ export default function Home() {
     setLoading(true);
     setResult(null);
 
+    const coords = await getCoordinates();
     const res = await fetch(base64);
     const blob = await res.blob();
     const formData = new FormData();
     formData.append("file", blob, "snapshot.jpg");
+
+    if (coords) {
+      formData.append("latitude", coords.latitude.toString());
+      formData.append("longitude", coords.longitude.toString());
+    }
 
     const response = await fetch("http://localhost:8000/analyze", {
       method: "POST",
@@ -88,7 +100,6 @@ export default function Home() {
 
     const data = await response.json();
     setResult(data);
-
 
     setLoading(false);
   }

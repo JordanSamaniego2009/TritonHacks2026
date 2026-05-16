@@ -114,8 +114,8 @@ export default function Chat() {
 
         {/*Title */}
         <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center gap-2">
-          <img src="/pinnicalMini.png" alt="Logo" className="w-6 h-6" />
-          <h2 className="text-lg text-yellow-500">Pinnical</h2>
+          <img src="/miniLogo.svg" alt="Logo" className="w-6 h-6" />
+          <h2 className="text-lg ">Pinnical</h2>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">{user?.user_metadata.full_name}</span>

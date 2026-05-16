@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from huggingface_hub import InferenceClient
 from transformers import pipeline
 from PIL import Image
+from typing import Optional
+from geopy.geocoders import Nominatim
 import io
 import requests
 import os
@@ -46,6 +48,7 @@ app.add_middleware(
 )
 
 hfToken = os.getenv("HF_TOKEN")
+geolocator = Nominatim(user_agent="fastapi_geocoder_app")
 detectionModel = "https://router.huggingface.co/hf-inference/models/google/vit-base-patch16-224"
 
 @app.get("/")
@@ -54,7 +57,9 @@ def root():
 
 @app.post("/analyze")
 async def analyzeImage(
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    latitude: Optional[float] = Form(None),
+    longitude: Optional[float] = Form(None)
 ):
     imageBytes = await file.read()
 
@@ -78,6 +83,10 @@ async def analyzeImage(
     # Run the local classifier
     secondaryResults = classifier(image, candidate_labels=choices)
 
+    location = geolocator.reverse(f"{latitude}, {longitude}")
+    print(latitude)
+    print(longitude)
+    print(location)
     print(f"secondary results: {secondaryResults}")
 
     label = result.get("label", "unknown")
@@ -86,8 +95,6 @@ async def analyzeImage(
     print(f"Label: {label}, Confidence: {confidence}")
     
     return {"label": label, "confidence": confidence}
-
-
 
 client = InferenceClient(api_key=hfToken)
 
