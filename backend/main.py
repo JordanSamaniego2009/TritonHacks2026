@@ -11,26 +11,6 @@ import io
 import requests
 import os
 
-#     from PIL import Image
-#     import io
-#     image = Image.open(io.BytesIO(imageBytes))
-
-#     # Define your candidate locations
-#     choices = ["San Jose", "San Diego", "Los Angeles", "Las Vegas", "San Francisco"]
-
-#     # Run the local classifier
-#     results = classifier(image, candidate_labels=choices)
-
-
-os.environ['HF_HOME'] = '/Users/jordan/Desktop/hf_cache'
-
-# url = "https://huggingface.co"
-# image = Image.open(requests.get(url, stream=True).raw)
-
-# choices = ["San Jose", "San Diego", "Los Angeles", "Las Vegas", "San Francisco"]
-
-# predictions = classifier(image, candidate_labels=choices)
-
 load_dotenv()
 
 app = FastAPI()
@@ -80,13 +60,12 @@ async def analyzeImage(
 
     choices = ["San Jose", "San Diego", "Los Angeles", "Las Vegas", "San Francisco"]
 
-    # Run the local classifier
     secondaryResults = classifier(image, candidate_labels=choices)
 
     location = geolocator.reverse(f"{latitude}, {longitude}")
     print(latitude)
     print(longitude)
-    print(location)
+    print(location.address)
     print(f"secondary results: {secondaryResults}")
 
     label = result.get("label", "unknown")
@@ -94,7 +73,7 @@ async def analyzeImage(
 
     print(f"Label: {label}, Confidence: {confidence}")
     
-    return {"label": label, "confidence": confidence}
+    return {"label": label, "confidence": confidence, "location": location.address}
 
 client = InferenceClient(api_key=hfToken)
 

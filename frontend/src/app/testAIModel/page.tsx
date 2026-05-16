@@ -10,7 +10,7 @@ const videoConstraints = {
 };
 
 export default function Home() {
-  const [result, setResult] = useState<{ label: string; confidence: number} | null>(null);
+  const [result, setResult] = useState<{ label: string; confidence: number; location: string} | null>(null);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [hasPermission, setPermission] = useState<boolean | null>(null);
@@ -180,8 +180,9 @@ export default function Home() {
             <Badge variant="secondary">{result.confidence}%</Badge>
             <Badge variant="secondary">{result.label}</Badge>
           </CardHeader>
-          <CardContent className="flex items-center justify-between">
+          <CardContent className="flex flex-col items-center justify-center">
             <p className="text-2xl font-bold capitalize">{result.label}</p>
+            <p className="text-xl">{result.location}</p>
           </CardContent>
         </Card>
       )}

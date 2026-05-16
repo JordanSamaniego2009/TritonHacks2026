@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import dynamic from "next/dynamic";
+
+const MapPanel = dynamic(() => import("./Mappanel"), { ssr: false });
 
 type Message = {
   id: number;
@@ -44,14 +46,12 @@ export default function Chat() {
   }, []);
 
   useEffect(() => {
-    // load existing messages
     supabase
       .from("messages")
       .select("*")
       .order("created_at", { ascending: true })
       .then(({ data }) => setMessages(data ?? []));
 
-    // real-time subscription
     const channel = supabase
       .channel("messages")
       .on("postgres_changes", {
@@ -78,7 +78,6 @@ export default function Chat() {
     if (!input.trim() || !user) return;
     const content = input.trim();
     setInput("");
-
     await supabase.from("messages").insert({
       user_id: user.id,
       user_name: user.user_metadata.full_name,
@@ -91,10 +90,8 @@ export default function Chat() {
     if (!aiInput.trim()) return;
     const content = aiInput.trim();
     setAiInput("");
-
     setAiMessages((prev) => [...prev, { role: "user", content }]);
     setAiLoading(true);
-
     const res = await fetch("/api/ai-chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -108,92 +105,158 @@ export default function Chat() {
   return (
     <main className="flex flex-col h-screen bg-background">
 
-      {/* header */}
-      <div className="relative border-b px-4 py-3 flex items-center justify-between">
-        <h1 className="font-semibold">Chat Room</h1>
-
-        {/*Title */}
-        <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center gap-2">
-          <img src="/miniLogo.svg" alt="Logo" className="w-6 h-6" />
-          <h2 className="text-lg ">Pinnical</h2>
-        </div>
+      {/* ── Top nav ── */}
+      <header className="flex items-center justify-between border-b px-5 py-3 shrink-0">
+        {/* Logo / brand */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">{user?.user_metadata.full_name}</span>
-        <Button variant="outline" size="sm" onClick={() => window.location.href = "/"}>
+          <img src="/miniLogo.svg" alt="Logo" className="w-6 h-6" />
+          <span className="text-lg font-semibold" style={{ color: "oklch(0.655 0.095 78.0)" }}>
+            Pinnical
+          </span>
+        </div>
+
+        {/* Right side: user + actions */}
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground hidden sm:block">
+            {user?.user_metadata.full_name}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => window.location.href = "/"}>
             Go back
           </Button>
-          <Button variant="outline" size="sm" onClick={() => supabase.auth.signOut().then(() => window.location.href = "/")}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => supabase.auth.signOut().then(() => window.location.href = "/")}
+          >
             Sign out
           </Button>
         </div>
-      </div>
+      </header>
 
-      {/* two panels */}
+      {/* ── Body: three columns ── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* group chat */}
-        <div className="flex flex-col flex-1 border-r">
-          <div className="px-4 py-2 border-b">
-            <p className="text-sm font-medium">Group chat</p>
-            <p className="text-xs text-muted-foreground">Users Connected:  </p>
+        {/* ── LEFT: Group chat sidebar ── */}
+        <aside className="w-80 shrink-0 flex flex-col border-r bg-card overflow-hidden">
+
+          {/* Sidebar header */}
+          <div className="px-4 pt-4 pb-3 border-b">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+              Live Chat
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Users connected: {new Set(messages.map((m) => m.user_id)).size}
+            </p>
           </div>
-          <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
+
+          {/* Messages list */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4">
+            {messages.length === 0 && (
+              <p className="text-xs text-muted-foreground text-center mt-6">
+                No messages yet. Say something!
+              </p>
+            )}
             {messages.map((msg) => (
-              <div key={msg.id} className="flex items-start gap-3">
-                <Avatar className="w-8 h-8">
+              <div key={msg.id} className="flex items-start gap-2.5">
+                <Avatar className="w-7 h-7 shrink-0">
                   <AvatarImage src={msg.user_avatar} />
-                  <AvatarFallback>{msg.user_name?.[0]}</AvatarFallback>
+                  <AvatarFallback className="text-xs">{msg.user_name?.[0]}</AvatarFallback>
                 </Avatar>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium">{msg.user_name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(msg.created_at).toLocaleTimeString()}
+                <div className="min-w-0">
+                  <div className="flex items-baseline gap-2 mb-0.5">
+                    <span className="text-xs font-medium truncate">{msg.user_name}</span>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </div>
-                  <p className="text-sm">{msg.content}</p>
+                  <p className="text-xs leading-relaxed text-foreground/90 break-words">{msg.content}</p>
                 </div>
               </div>
             ))}
             <div ref={groupBottomRef} />
           </div>
-          <div className="border-t px-4 py-3 flex gap-2">
+
+          {/* Sidebar input */}
+          <div className="border-t px-3 py-3 flex gap-2">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
               placeholder="Message the group..."
-              className="flex-1"
+              className="flex-1 h-8 text-xs"
             />
-            <Button onClick={sendMessage}>Send</Button>
+            <Button size="sm" className="h-8 px-3 text-xs" onClick={sendMessage}>
+              Send
+            </Button>
           </div>
+        </aside>
+
+        {/* ── CENTER: Leaflet map ── */}
+        <div className="flex-1 min-w-0 relative overflow-hidden">
+          <MapPanel />
         </div>
 
-        {/* ai chat */}
-        <div className="flex flex-col flex-1">
-          <div className="px-4 py-2 border-b">
-            <p className="text-sm font-medium">AI assistant</p>
-            <p className="text-xs text-muted-foreground">Private — not saved</p>
+        {/* ── RIGHT: AI chat ── */}
+        <section className="flex flex-col w-80 shrink-0 border-l overflow-hidden">
+
+          {/* AI panel header */}
+          <div className="px-5 py-3 border-b flex items-center justify-between shrink-0">
+            <div>
+              <p className="text-sm font-medium">AI Assistant</p>
+              <p className="text-xs text-muted-foreground">Private — not saved</p>
+            </div>
+            <Badge variant="secondary" className="text-xs">AI</Badge>
           </div>
-          <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
+
+          {/* AI messages */}
+          <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5">
+            {aiMessages.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
+                <p className="text-sm font-medium text-muted-foreground">Ask me anything</p>
+                <p className="text-xs text-muted-foreground">Your conversation is private and not saved.</p>
+              </div>
+            )}
             {aiMessages.map((msg, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <Avatar className="w-8 h-8">
-                  <AvatarFallback>{msg.role === "ai" ? "AI" : user?.user_metadata.full_name?.[0]}</AvatarFallback>
+              <div
+                key={i}
+                className={`flex items-start gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
+              >
+                <Avatar className="w-8 h-8 shrink-0">
+                  <AvatarFallback className="text-xs">
+                    {msg.role === "ai" ? "AI" : user?.user_metadata.full_name?.[0]}
+                  </AvatarFallback>
                 </Avatar>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium">{msg.role === "ai" ? "Placeholder AI" : "You"}</span>
-                    {msg.role === "ai" && <Badge variant="secondary" className="text-xs">AI</Badge>}
+                <div className={`max-w-[70%] ${msg.role === "user" ? "items-end" : "items-start"} flex flex-col gap-1`}>
+                  <span className="text-xs text-muted-foreground">
+                    {msg.role === "ai" ? "AI Assistant" : "You"}
+                  </span>
+                  <div
+                    className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                      msg.role === "user"
+                        ? "bg-primary text-primary-foreground rounded-tr-sm"
+                        : "bg-muted text-foreground rounded-tl-sm"
+                    }`}
+                  >
+                    {msg.content}
                   </div>
-                  <p className="text-sm">{msg.content}</p>
                 </div>
               </div>
             ))}
-            {aiLoading && <p className="text-sm text-muted-foreground animate-pulse">Thinking...</p>}
+            {aiLoading && (
+              <div className="flex items-start gap-3">
+                <Avatar className="w-8 h-8 shrink-0">
+                  <AvatarFallback className="text-xs">AI</AvatarFallback>
+                </Avatar>
+                <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-2.5">
+                  <span className="text-sm text-muted-foreground animate-pulse">Thinking…</span>
+                </div>
+              </div>
+            )}
             <div ref={aiBottomRef} />
           </div>
-          <div className="border-t px-4 py-3 flex gap-2">
+
+          {/* AI input */}
+          <div className="border-t px-5 py-4 flex gap-3 shrink-0">
             <Input
               value={aiInput}
               onChange={(e) => setAiInput(e.target.value)}
@@ -203,7 +266,7 @@ export default function Chat() {
             />
             <Button onClick={sendAiMessage}>Ask</Button>
           </div>
-        </div>
+        </section>
 
       </div>
     </main>
