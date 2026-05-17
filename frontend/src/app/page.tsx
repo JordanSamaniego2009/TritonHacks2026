@@ -44,6 +44,20 @@ export default function Home() {
           font-family: 'Geist Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
 
+        .hero-figure {
+        position: absolute;
+        right: calc(40% - 560px);
+        bottom: 0;
+        height: 75vh;
+        max-height: 680px;
+        opacity: 0;
+        mask-image: linear-gradient(to top, transparent 0%, black 25%, black 70%, transparent 100%);
+        -webkit-mask-image: linear-gradient(to top, transparent 0%, black 25%, black 70%, transparent 100%);
+        animation: fadeIn 1.2s ease forwards 0.7s;
+        pointer-events: none;
+        user-select: none;
+      }
+
         .bg-grid {
           position: absolute;
           inset: 0;
@@ -235,6 +249,7 @@ export default function Home() {
 
       <div className="page">
         <div className="bg-grid" />
+        <img src="/delta.svg" alt="" className="hero-figure" />
         <div className="bg-glow" />
 
        
@@ -242,7 +257,7 @@ export default function Home() {
 
         <div className="content">
           <p className="eyebrow">Welcome to</p>
-          <h1 className="wordmark">Pinn<span>i</span>cal</h1>
+          <h1 className="wordmark"><span>Pin</span>nical</h1>
           <p className="tagline">The Pinnacle of Connecting With Others</p>
 
           {user ? (

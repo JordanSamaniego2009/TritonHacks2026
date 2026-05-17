@@ -20,6 +20,7 @@ type Pin = {
 	created_at: string;
 	image: string | null;
 	user_id: string;
+	user_name?: string | null;
 	latitude: number;
 	longitude: number;
 	label?: string;
@@ -43,8 +44,10 @@ type AnalysisResult = {
 };
 
 type MapPanelProps = {
+  userName?: string;
 	onAnalysisResult?: (result: AnalysisResult, pinId?: number) => void;
 	onPinContextSwitch?: (pin: Pin | null) => void;
+  onPinSelect?: (pin: Pin | null) => void;
 	servicePins?: ServicePin[];
 	onClearServicePins?: () => void;
 };
@@ -80,7 +83,7 @@ function PinModal(
 		currentUserID: string;
 		activeContextPinID: number | null;
 		onClose: () => void;
-		onDelete: (id: number) => void;
+		onDelete: (id: number) => Promise<void>;
 		onSwitchContext: (pin: Pin | null) => void;
 	}
 ) {
@@ -93,7 +96,7 @@ function PinModal(
 	  className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 backdrop-blur-sm"
 	  onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
 	>
-      <div className="relative w-full max-w-sm mx-4">
+      <div className="relative w-full max-w-lg mx-4">
         {isActive && (
           <div className="absolute -inset-1 rounded-2xl bg-yellow-400/40 blur-sm pointer-events-none" />
         )}
@@ -106,7 +109,7 @@ function PinModal(
           )}
 
           {pin.image ? (
-            <div className="w-full aspect-video bg-muted overflow-hidden">
+            <div className="w-full aspect-square bg-muted overflow-hidden">
               <img src={pin.image} alt="pin" className="w-full h-full object-cover" />
             </div>
           ) : (
@@ -124,13 +127,10 @@ function PinModal(
             <div className="flex items-start justify-between gap-2">
               <div className="flex flex-col gap-0.5">
                 <span className="text-sm font-semibold text-foreground">
-                  {pin.label || (ownsPin ? "My Pin" : "Someone's Pin")}
+                  {pin.label || (ownsPin ? "My Pin" : `${pin.user_name ?? "Someone"}'s Pin`)}
                 </span>
                 <span className="text-xs text-muted-foreground">{date}</span>
               </div>
-              <Badge variant={ownsPin ? "default" : "secondary"} className="shrink-0">
-                {ownsPin ? "You" : "Other user"}
-              </Badge>
             </div>
 
             <div className="flex gap-2 text-xs text-muted-foreground font-mono bg-muted/50 rounded-md px-3 py-2">
@@ -156,7 +156,7 @@ function PinModal(
                 {isActive ? "← Clear AI context" : "Set as AI context"}
               </Button>
               {ownsPin && (
-                <Button variant="destructive" onClick={() => { onDelete(pin.id); onClose(); }}>
+                <Button variant="destructive" onClick={async () => { await onDelete(pin.id); onClose(); }}>
                   Delete
                 </Button>
               )}
@@ -211,7 +211,7 @@ function CameraModal( { onClose, onCapture }: {
       className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="relative w-full max-w-lg mx-4 flex flex-col gap-4">
+      <div className="relative w-full max-w-2xl mx-4 flex flex-col gap-4">
         <button
           onClick={onClose}
           className="absolute -top-3 -right-3 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-card border border-border shadow text-muted-foreground hover:text-foreground"
@@ -219,7 +219,7 @@ function CameraModal( { onClose, onCapture }: {
 
         <Card>
           <CardContent className="flex flex-col items-center gap-4 pt-6 pb-6">
-            <div className="relative w-full aspect-video bg-muted rounded-lg overflow-hidden flex items-center justify-center border border-dashed border-border">
+            <div className="relative w-full aspect-[4/3] bg-muted rounded-lg overflow-hidden flex items-center justify-center border border-dashed border-border">
               {cameraActive && hasPermission ? (
                 <Webcam audio={false} ref={webcamRef} screenshotFormat="image/jpeg"
                   videoConstraints={videoConstraints} className="w-full h-full object-cover" />
@@ -258,7 +258,7 @@ function CameraModal( { onClose, onCapture }: {
   );
 }
 
-export default function MapPanel( { onAnalysisResult, onPinContextSwitch, servicePins, onClearServicePins }: MapPanelProps) {
+export default function MapPanel( { userName, onAnalysisResult, onPinContextSwitch, onPinSelect, servicePins, onClearServicePins }: MapPanelProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const leafletRef = useRef<any>(null);
@@ -286,14 +286,34 @@ export default function MapPanel( { onAnalysisResult, onPinContextSwitch, servic
   });
   
   // variable changes:
-  async function handleDelete(id: number) {
-    await supabase.from("pins").delete().eq("id", id);
+  async function handleDelete(id: number): Promise<void> {
+    const marker = lMarkersRef.current.get(id);
+    if (marker) {
+      marker.remove();
+      lMarkersRef.current.delete(id);
+    }
+
+    const { error } = await supabase.from("pins").delete().eq("id", id);
+
+    if (error) {
+      console.error("Delete Failed", error);
+      const { data } = await supabase.from("pins").select("*").order("created_at", { ascending: false });
+      if (data) setPins(data as Pin[]);
+      return;
+    }
+
+    setPins((prev) => prev.filter((p) => p.id !== id));
+    if (selectedPin?.id === id) {
+      setSelectedPin(null);
+      onPinSelect?.(null);
+    }
     if (activeContextPin?.id === id) {
       setActiveContextPin(null);
       activeContextPinRef.current = null;
       onPinContextSwitch?.(null);
     }
   }
+
 
   function handleContextSwitch(pin: Pin | null) {
     setActiveContextPin(pin);
@@ -302,7 +322,7 @@ export default function MapPanel( { onAnalysisResult, onPinContextSwitch, servic
   }
   
   // backend functions:
-   function compressImage(dataUrl: string, quality = 0.6, maxWidth = 800): Promise<string> {
+   function compressImage(dataUrl: string, quality = 1.0, maxWidth = 800): Promise<string> { // no compression
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => { // scale down the image to save more storage
@@ -345,7 +365,8 @@ export default function MapPanel( { onAnalysisResult, onPinContextSwitch, servic
 
     const { data, error } = await supabase.from("pins").insert({
       image: compressed,
-      user_id: currentUserID,
+      user_id: currentUserID, 
+      user_name: userName ?? "Anonymous",
       latitude: coords.latitude,
       longitude: coords.longitude, // bottom three we'll do later if i have time - jordan
       label: "",
@@ -486,7 +507,10 @@ export default function MapPanel( { onAnalysisResult, onPinContextSwitch, servic
         const lm = L.marker([pin.latitude, pin.longitude], { icon }).addTo(map);
         lm._pin = pin;
         if (isActive) lm.setZIndexOffset(1000);
-        lm.on("click", () => setSelectedPin({ ...lm._pin }));
+        lm.on("click", () => {
+          setSelectedPin({ ...lm._pin });
+          onPinSelect?.({ ...lm._pin });
+        });
         lMarkersRef.current.set(pin.id, lm);
         stale.delete(pin.id);
       }
@@ -496,6 +520,7 @@ export default function MapPanel( { onAnalysisResult, onPinContextSwitch, servic
       lMarkersRef.current.get(id)?.remove();
       lMarkersRef.current.delete(id);
     });
+
   }, [currentUserID]);
 
   useEffect(() => {

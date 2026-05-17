@@ -60,6 +60,9 @@ export default function Chat() {
 
 	const [analysisContext, setAnalysisContext] = useState<AnalysisResult | null>(null);
 	const [servicePins, setServicePins] = useState<ServicePin[]>([]);
+
+  	const [selectedCommentPin, setSelectedCommentPin] = useState<{id: number, label?: string} | null>(null);
+  	const [comments, setComments] = useState<Message[]>([]);
 	
 	// helper function for frontend (neil stuff):
 	function handleAnalysisResult(result: AnalysisResult) {
@@ -74,17 +77,34 @@ export default function Chat() {
 		});
 	}, []);
 
-	useEffect(() => { //  load all existing messages and wait for new messages to also load in
-		supabase.from("messages").select("*").order("created_at", { ascending: true })
-		  .then(({ data }) => setMessages(data ?? []));
+  	useEffect(() => { // load all comments for the pin and continously check for new comments for the selected pin
+		if (!selectedCommentPin) {
+			setComments([]);
+			return;
+		}
 
-		const channel = supabase.channel("messages")
-		  .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" },
-			(payload) => setMessages((prev) => [...prev, payload.new as Message]))
-		  .subscribe();
+		supabase.from("comments")
+			.select("*")
+			.eq("pin_id", selectedCommentPin.id)
+			.order("created_at", { ascending: true })
+			.then(({ data }) => setComments(data ?? []));
 
-		return () => { supabase.removeChannel(channel); };
-	}, []);
+		const channel = supabase.channel(`comments-${selectedCommentPin.id}`)
+			.on("postgres_changes", {
+			event: "INSERT",
+			schema: "public",
+			table: "comments",
+			}, (payload) => {
+			const newComment = payload.new as Message & { pin_id: number };
+			if (newComment.pin_id === selectedCommentPin.id) {
+				setComments((prev) => [...prev, newComment]);
+			}
+			})
+			.subscribe();
+
+			return () => { supabase.removeChannel(channel); };
+	}, [selectedCommentPin?.id]);
+
 
 	useEffect(() => { // auto scroll chat
 		groupBottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -151,20 +171,20 @@ export default function Chat() {
 		setAIMessages( (prev) => [...prev, { role: "ai", content: data.response }] );
 	}
 	
-	async function sendMessage() {
-		if (!input.trim() || !user) return;
-		
-		const content = input.trim();
-		
-		setInput("");
-		
-		await supabase.from("messages").insert({
-		  user_id: user.id,
-		  user_name: user.user_metadata.full_name,
-		  user_avatar: user.user_metadata.avatar_url,
-		  content
-		});
-	}
+  async function sendComment() {
+    if (!input.trim() || !user || !selectedCommentPin) return;
+
+    const content = input.trim();
+    setInput("");
+
+    await supabase.from("comments").insert({
+      pin_id:      selectedCommentPin.id,
+      user_id:     user.id,
+      user_name:   user.user_metadata.full_name,
+      user_avatar: user.user_metadata.avatar_url,
+      content,
+    });
+  }
 	
 	// frontend lol neil got that ewwwwwwww
 	return (
@@ -189,46 +209,66 @@ export default function Chat() {
 		  </header>
 
 		  <div className="flex flex-1 overflow-hidden">
-			<aside className="w-80 shrink-0 flex flex-col border-r bg-card overflow-hidden">
-			  <div className="px-4 pt-4 pb-3 border-b">
-				<p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">Group Chat</p>
-				<p className="text-xs text-muted-foreground">Talk Below</p>
-			  </div>
-			  <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4">
-				{messages.length === 0 && (
-				  <p className="text-xs text-muted-foreground text-center mt-6">No messages yet. Say something!</p>
-				)}
-				{messages.map((msg) => (
-				  <div key={msg.id} className="flex items-start gap-2.5">
-					<Avatar className="w-7 h-7 shrink-0">
-					  <AvatarFallback className="text-xs">{msg.user_name?.[0]}</AvatarFallback>
-					</Avatar>
-					<div className="min-w-0">
-					  <div className="flex items-baseline gap-2 mb-0.5">
-						<span className="text-xs font-medium truncate">{msg.user_name}</span>
-						<span className="text-[10px] text-muted-foreground shrink-0">
-						  {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-						</span>
-					  </div>
-					  <p className="text-xs leading-relaxed text-foreground/90 wrap-break-words">{msg.content}</p>
-					</div>
-				  </div>
-				))}
-				<div ref={groupBottomRef} />
-			  </div>
-			  <div className="border-t px-3 py-3 flex gap-2">
-				<Input value={input} onChange={(e) => setInput(e.target.value)}
-				  onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-				  placeholder="Message the group..." className="flex-1 h-8 text-xs" />
-				<Button size="sm" className="h-8 px-3 text-xs" onClick={sendMessage}>Send</Button>
-			  </div>
-			</aside>
+      <aside className="w-80 shrink-0 flex flex-col border-r bg-card overflow-hidden">
+        <div className="px-4 pt-4 pb-3 border-b">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
+            {selectedCommentPin ? `📍 ${selectedCommentPin.label || "Pin"}` : "Comments"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {selectedCommentPin ? "Comments for this pin" : "Click a pin to see comments"}
+          </p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4">
+          {!selectedCommentPin && (
+            <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
+              <p className="text-xs text-muted-foreground">Click any pin on the map to see its comments.</p>
+            </div>
+          )}
+          {selectedCommentPin && comments.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center mt-6">No comments yet. Be the first!</p>
+          )}
+          {comments.map((msg) => (
+            <div key={msg.id} className="flex items-start gap-2.5">
+              <Avatar className="w-7 h-7 shrink-0">
+                <AvatarFallback className="text-xs">{msg.user_name?.[0]}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-2 mb-0.5">
+                  <span className="text-xs font-medium truncate">{msg.user_name}</span>
+                  <span className="text-[10px] text-muted-foreground shrink-0">
+                    {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+                <p className="text-xs leading-relaxed text-foreground/90 break-words">{msg.content}</p>
+              </div>
+            </div>
+          ))}
+          <div ref={groupBottomRef} />
+        </div>
+
+        <div className="border-t px-3 py-3 flex gap-2">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && sendComment()}
+            placeholder={selectedCommentPin ? "Add a comment..." : "Select a pin first"}
+            disabled={!selectedCommentPin}
+            className="flex-1 h-8 text-xs"
+          />
+          <Button size="sm" className="h-8 px-3 text-xs" onClick={sendComment} disabled={!selectedCommentPin}>
+            Send
+          </Button>
+        </div>
+      </aside>
 
 			<div className="flex-1 min-w-0 relative overflow-hidden">
 			  <MapPanel
+			    userName={user?.user_metadata?.full_name}
 				onAnalysisResult={handleAnalysisResult}
 				servicePins={servicePins}
 				onClearServicePins={() => setServicePins([])}
+        onPinSelect={(pin) => setSelectedCommentPin(pin ? { id: pin.id, label: pin.label } : null)}
 				onPinContextSwitch={async (pin) => {
 				  if (pin) {
 					const compressImage = (dataUrl: string): Promise<string> =>
@@ -240,7 +280,7 @@ export default function Chat() {
 						  canvas.width = img.width * scale;
 						  canvas.height = img.height * scale;
 						  canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-						  resolve(canvas.toDataURL("image/jpeg", 0.6));
+						  resolve(canvas.toDataURL("image/jpeg", 1.0)); // no compression test
 						};
 						img.src = dataUrl;
 					  });
@@ -266,7 +306,7 @@ export default function Chat() {
 			  />
 			</div>
 
-			<section className="flex flex-col w-90 shrink-0 border-l overflow-hidden">
+			<section className="flex flex-col w-120 shrink-0 border-l overflow-hidden">
 			  <div className="px-5 py-3 border-b flex items-center justify-between shrink-0">
 				<div>
 				  <p className="text-sm font-medium">AI Assistant</p>
