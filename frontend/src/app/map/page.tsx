@@ -10,6 +10,17 @@ import dynamic from "next/dynamic";
 
 const MapPanel = dynamic(() => import("./Mappanel"), { ssr: false });
 
+type AnalysisResult = {
+  scene_type: string;
+  culture: string;
+  historical_context: string;
+  description: string;
+  weather: string;
+  flora_fauna: string[];
+  confidence: number;
+  location: string;
+  error?: string;
+};
 type Message = {
   id: number;
   user_id: string;
@@ -18,7 +29,6 @@ type Message = {
   content: string;
   created_at: string;
 };
-
 type AiMessage = {
   role: "user" | "ai";
   content: string;
@@ -27,16 +37,41 @@ type AiMessage = {
 export default function Chat() {
   const [user, setUser] = useState<any>(null);
 
-  // group chat
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const groupBottomRef = useRef<HTMLDivElement>(null);
 
-  // ai chat
   const [aiMessages, setAiMessages] = useState<AiMessage[]>([]);
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const aiBottomRef = useRef<HTMLDivElement>(null);
+
+  const [analysisContext, setAnalysisContext] = useState<AnalysisResult | null>(null);
+
+  function handleAnalysisResult(result: AnalysisResult) {
+    setAnalysisContext(result);
+  }
+
+  async function sendAiMessage() {
+    if (!aiInput.trim()) return;
+    const content = aiInput.trim();
+    setAiInput("");
+    setAiMessages((prev) => [...prev, { role: "user", content }]);
+    setAiLoading(true);
+
+  const contextPrefix = analysisContext
+    ? `[Image context — scene: ${analysisContext.scene_type}, culture: ${analysisContext.culture}, weather: ${analysisContext.weather}, flora/fauna: ${(analysisContext.flora_fauna ?? []).join(", ")}, history: ${analysisContext.historical_context}, location: ${analysisContext.location}] `
+    : "";
+
+    const res = await fetch("/api/ai-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: contextPrefix + content }),
+    });
+    const data = await res.json();
+    setAiLoading(false);
+    setAiMessages((prev) => [...prev, { role: "ai", content: data.response }]);
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -86,36 +121,16 @@ export default function Chat() {
     });
   }
 
-  async function sendAiMessage() {
-    if (!aiInput.trim()) return;
-    const content = aiInput.trim();
-    setAiInput("");
-    setAiMessages((prev) => [...prev, { role: "user", content }]);
-    setAiLoading(true);
-    const res = await fetch("/api/ai-chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: content }),
-    });
-    const data = await res.json();
-    setAiLoading(false);
-    setAiMessages((prev) => [...prev, { role: "ai", content: data.response }]);
-  }
-
   return (
     <main className="flex flex-col h-screen bg-background">
-
-      {/* ── Top nav ── */}
       <header className="flex items-center justify-between border-b px-5 py-3 shrink-0">
-        {/* Logo / brand */}
         <div className="flex items-center gap-2">
-          <img src="/miniLogo.svg" alt="Logo" className="w-6 h-6" />
+          <img src="/miniLogo.svg" alt="Logo" className="w-4.2 h-6" />
           <span className="text-lg font-semibold" style={{ color: "oklch(0.655 0.095 78.0)" }}>
             Pinnical
           </span>
         </div>
 
-        {/* Right side: user + actions */}
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground hidden sm:block">
             {user?.user_metadata.full_name}
@@ -133,23 +148,20 @@ export default function Chat() {
         </div>
       </header>
 
-      {/* ── Body: three columns ── */}
+      {}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── LEFT: Group chat sidebar ── */}
         <aside className="w-80 shrink-0 flex flex-col border-r bg-card overflow-hidden">
 
-          {/* Sidebar header */}
           <div className="px-4 pt-4 pb-3 border-b">
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-              Live Chat
+              Group Chat
             </p>
             <p className="text-xs text-muted-foreground">
-              Users connected: {new Set(messages.map((m) => m.user_id)).size}
+              Talk Below
             </p>
           </div>
 
-          {/* Messages list */}
           <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-4">
             {messages.length === 0 && (
               <p className="text-xs text-muted-foreground text-center mt-6">
@@ -176,7 +188,6 @@ export default function Chat() {
             <div ref={groupBottomRef} />
           </div>
 
-          {/* Sidebar input */}
           <div className="border-t px-3 py-3 flex gap-2">
             <Input
               value={input}
@@ -191,15 +202,11 @@ export default function Chat() {
           </div>
         </aside>
 
-        {/* ── CENTER: Leaflet map ── */}
         <div className="flex-1 min-w-0 relative overflow-hidden">
-          <MapPanel />
+          <MapPanel onAnalysisResult={handleAnalysisResult} />
         </div>
 
-        {/* ── RIGHT: AI chat ── */}
-        <section className="flex flex-col w-80 shrink-0 border-l overflow-hidden">
-
-          {/* AI panel header */}
+        <section className="flex flex-col w-90 shrink-0 border-l overflow-hidden">
           <div className="px-5 py-3 border-b flex items-center justify-between shrink-0">
             <div>
               <p className="text-sm font-medium">AI Assistant</p>
@@ -208,7 +215,6 @@ export default function Chat() {
             <Badge variant="secondary" className="text-xs">AI</Badge>
           </div>
 
-          {/* AI messages */}
           <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5">
             {aiMessages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
@@ -255,13 +261,12 @@ export default function Chat() {
             <div ref={aiBottomRef} />
           </div>
 
-          {/* AI input */}
           <div className="border-t px-5 py-4 flex gap-3 shrink-0">
             <Input
               value={aiInput}
               onChange={(e) => setAiInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendAiMessage()}
-              placeholder="Ask the AI anything..."
+              placeholder="Ask the AI anything"
               className="flex-1"
             />
             <Button onClick={sendAiMessage}>Ask</Button>

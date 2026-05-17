@@ -24,7 +24,7 @@ export default function Home() {
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/testChatroom`,
+        redirectTo: `${window.location.origin}/map`,
       },
     });
   }
@@ -38,11 +38,15 @@ export default function Home() {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
         <Card className="w-full max-w-sm">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold text-white">Pinnical</h1>
+            <p className="mt-1 text-white">The Pinnacle of Connecting With Others </p>
+          </div>
           <CardHeader>
             <CardTitle className="text-base font-medium">Signed in as {user.user_metadata.full_name}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            <Button onClick={() => window.location.href = "/testChatroom"}>Go to chat</Button>
+            <Button onClick={() => window.location.href = "/map"}>Go to Map</Button>
             <Button variant="outline" onClick={signOut}>Sign out</Button>
           </CardContent>
         </Card>
@@ -53,6 +57,10 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background">
       <Card className="w-full max-w-sm">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold text-white">Pinnical</h1>
+            <p className="mt-1 text-white">The Pinnacle of Connecting With Others </p>
+          </div>
         <CardHeader>
           <CardTitle className="text-center text-xl font-semibold">Chat Room</CardTitle>
           <p className="text-center text-sm text-muted-foreground">Connect with ohters</p>
