@@ -50,8 +50,8 @@ export default function Home() {
         bottom: 0;
         height: 75vh;
         max-height: 680px;
-        opacity: 0.5;
-        filter: sepia(0.6) saturate(1.2) hue-rotate(10deg);
+        opacity: 0.3;
+        filter: sepia(0.8) saturate(1.8) hue-rotate(5deg) brightness(1.1);
         mask-image: linear-gradient(to top, transparent 0%, black 25%, black 70%, transparent 100%);
         -webkit-mask-image: linear-gradient(to top, transparent 0%, black 25%, black 70%, transparent 100%);
         pointer-events: none;
@@ -62,8 +62,8 @@ export default function Home() {
           position: absolute;
           inset: 0;
           background-image:
-            linear-gradient(oklch(0.655 0.095 78.0 / 0.04) 1px, transparent 1px),
-            linear-gradient(90deg, oklch(0.655 0.095 78.0 / 0.04) 1px, transparent 1px);
+          linear-gradient(oklch(0.655 0.095 78.0 / 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, oklch(0.655 0.095 78.0 / 0.04) 1px, transparent 1px);
           background-size: 48px 48px;
         }
 
