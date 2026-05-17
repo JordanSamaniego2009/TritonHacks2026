@@ -174,8 +174,8 @@ function CameraModal( { onClose, onCapture }: {
 }) { // basically code from version 0:
 	const [hasPermission, setPermission] = useState<boolean | null>(null);
 	const [cameraActive, setCameraActive] = useState(false);
-	const [preview, setPreview]           = useState<string | null>(null);
-	const [coords, setCoords]             = useState<{ latitude: number; longitude: number } | null>(null);
+	const [preview, setPreview] = useState<string | null>(null);
+	const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
 	const webcamRef = useRef<Webcam>(null);
 	
 	useEffect(() => {
@@ -328,7 +328,7 @@ export default function MapPanel( { onAnalysisResult, onPinContextSwitch, servic
         if (!navigator.geolocation) return resolve(null);
         navigator.geolocation.getCurrentPosition(
           (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-          ()    => resolve(null),
+          () => resolve(null),
           { timeout: 6000, maximumAge: 60000, enableHighAccuracy: false }
         );
       });
@@ -344,13 +344,13 @@ export default function MapPanel( { onAnalysisResult, onPinContextSwitch, servic
     }
 
     const { data, error } = await supabase.from("pins").insert({
-      image:     compressed,
-      user_id:   currentUserID,
-      latitude:  coords.latitude,
+      image: compressed,
+      user_id: currentUserID,
+      latitude: coords.latitude,
       longitude: coords.longitude, // bottom three we'll do later if i have time - jordan
-      label:     "",
-      note:      "",
-      analysis:  "",
+      label: "",
+      note: "",
+      analysis: "",
     }).select().single();
 
     if (error || !data) {
@@ -360,20 +360,22 @@ export default function MapPanel( { onAnalysisResult, onPinContextSwitch, servic
     }
 
     const newPin = data as Pin;
-    const pinID  = newPin.id;
+    const pinID = newPin.id;
 
     setActiveContextPin(newPin);
     activeContextPinRef.current = newPin;
     onPinContextSwitch?.(newPin);
 
     try {
-      const res  = await fetch(compressed);
+      const res = await fetch(compressed);
       const blob = await res.blob();
       const form = new FormData();
+
       form.append("file", blob, "pin.jpg");
       form.append("latitude",  coords.latitude.toString());
       form.append("longitude", coords.longitude.toString());
-      const r              = await fetch("http://localhost:8000/analyze", { method: "POST", body: form });
+
+      const r = await fetch("http://localhost:8000/analyze", { method: "POST", body: form });
       const analysisResult = await r.json() as AnalysisResult;
 
       await supabase.from("pins").update({
@@ -402,7 +404,7 @@ export default function MapPanel( { onAnalysisResult, onPinContextSwitch, servic
   
   // map logic:
   useEffect(() => {
-    const L   = leafletRef.current;
+    const L = leafletRef.current;
     const map = mapInstanceRef.current;
     if (!L || !map) return;
 
@@ -418,7 +420,7 @@ export default function MapPanel( { onAnalysisResult, onPinContextSwitch, servic
 
     servicePins.forEach((pin) => {
       const emoji = CATEGORY_EMOJI[pin.category] ?? "📍";
-      const icon  = L.divIcon({
+      const icon = L.divIcon({
         className: "",
         html: `<div style="
           background: #22c55e;
@@ -462,7 +464,7 @@ export default function MapPanel( { onAnalysisResult, onPinContextSwitch, servic
   }, []);
 
   const syncMarkers = useCallback((pinList: Pin[], activePinId: number | null) => {
-    const L   = leafletRef.current;
+    const L = leafletRef.current;
     const map = mapInstanceRef.current;
     if (!L || !map) return;
 
@@ -470,8 +472,8 @@ export default function MapPanel( { onAnalysisResult, onPinContextSwitch, servic
 
     pinList.forEach((pin) => {
       const isActive = pin.id === activePinId;
-      const color    = isActive ? ACTIVE_COLOR : pin.user_id === currentUserID ? MY_COLOR : OTHER_COLOR;
-      const icon     = buildSvgIcon(color, L, isActive);
+      const color = isActive ? ACTIVE_COLOR : pin.user_id === currentUserID ? MY_COLOR : OTHER_COLOR;
+      const icon = buildSvgIcon(color, L, isActive);
 
       if (lMarkersRef.current.has(pin.id)) {
         const lm = lMarkersRef.current.get(pin.id);
