@@ -132,3 +132,7 @@
     @apply font-sans;
   }
 }
+
+.brightened-tiles {
+    filter: brightness(3) contrast(0.60) saturate(0.85) !important;
+}
