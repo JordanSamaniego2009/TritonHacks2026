@@ -51,7 +51,7 @@ export default function Home() {
         height: 75vh;
         max-height: 680px;
         opacity: 0.3;
-        filter: sepia(0.8) saturate(1.8) hue-rotate(5deg) brightness(1.1);
+        filter: sepia(0.5) saturate(1.8) hue-rotate(5deg) brightness(1.1);
         mask-image: linear-gradient(to top, transparent 0%, black 25%, black 70%, transparent 100%);
         -webkit-mask-image: linear-gradient(to top, transparent 0%, black 25%, black 70%, transparent 100%);
         pointer-events: none;
