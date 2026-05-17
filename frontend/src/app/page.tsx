@@ -50,10 +50,10 @@ export default function Home() {
         bottom: 0;
         height: 75vh;
         max-height: 680px;
-        opacity: 0;
+        opacity: 0.5;
+        filter: sepia(0.6) saturate(1.2) hue-rotate(10deg);
         mask-image: linear-gradient(to top, transparent 0%, black 25%, black 70%, transparent 100%);
         -webkit-mask-image: linear-gradient(to top, transparent 0%, black 25%, black 70%, transparent 100%);
-        animation: fadeIn 1.2s ease forwards 0.7s;
         pointer-events: none;
         user-select: none;
       }
