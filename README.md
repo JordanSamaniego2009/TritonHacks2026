@@ -2,7 +2,7 @@
 
 A collaborative, real-time map app where users drop photo pins with locational data on a map. Each pin is analyzed by AI, and a built in AI assistant that lets you ask questions about what you're seeing.
 
-Built for hackathon @ [https://tritonhacks-26.devpost.com/].
+Built for hackathon @ https://tritonhacks-26.devpost.com/.
 
 ---
 
